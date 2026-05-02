@@ -1,0 +1,31 @@
+{
+  "name": "khabar",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c magenta,cyan \"pnpm -C artifacts/api-server dev\" \"pnpm -C artifacts/khabar dev\"",
+    "dev:web": "pnpm -C artifacts/khabar dev",
+    "dev:api": "pnpm -C artifacts/api-server dev",
+    "db:clear-demo": "pnpm -C scripts clear-demo-data",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "format": "prettier . -w"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "esbuild",
+      "unrs-resolver"
+    ]
+  },
+  "dependencies": {
+    "tailwind-scrollbar-hide": "^4.0.0"
+  }
+}

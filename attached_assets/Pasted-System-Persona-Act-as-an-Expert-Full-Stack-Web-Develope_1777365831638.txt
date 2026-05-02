@@ -1,0 +1,79 @@
+System Persona: Act as an Expert Full-Stack Web Developer and System Architect. Your task is to build "Khabar," a hyperlocal, AI-integrated citizen journalism web application.
+
+Project Goal: Create a production-ready, responsive React web application that allows users to post local news, sorts that news by physical proximity, and filters content through a 3-layer AI and community verification system. It must also track and visualize user credibility over time.
+
+Tech Stack Requirements:
+
+Frontend: React.js (Vite), Tailwind CSS (Dark mode default), Recharts (for credibility graphs).
+
+Icons: lucide-react.
+
+Backend & Database: Firebase (Firestore for real-time data sync, Firebase Auth for user management).
+
+AI Service (Mocked/Prep): Structure an async queue for Anthropic Claude API text validation.
+
+1. Database Schema (Firestore):
+Please implement the following collection structure:
+
+users: { uid, displayName, currentReputationScore, reputationHistory: [{ date, pointsChange, reason }], primaryLocality, createdAt }
+
+posts: { id, authorId, headline, category, isBreaking, location: { lat, lng, neighborhood }, verificationStatus, upvotes, downvotes, createdAt }
+
+2. Core UI Layout & Routing:
+Implement a 3-column desktop layout that collapses gracefully into a mobile-first view:
+
+Left Column (Desktop only): Sticky Navigation sidebar (Home, Explore, Post, Saved, Profile).
+
+Center Column (Global): The main content area (Feed, Post Form, or Profile Dashboard).
+
+Right Column (Desktop only): "Trending Locality" hashtags and a "Top Reporters" leaderboard sorted by currentReputationScore.
+
+Mobile View: Hide left and right columns. Add a fixed bottom navigation bar with icons.
+
+3. Feed & Verification Logic:
+The center feed must map over the posts collection in real-time using Firestore onSnapshot. Sort the feed primarily by timestamp (newest first), but pin items with isBreaking: true to the top. Include horizontally scrolling category chips (All, Infrastructure, Crime, Politics, Event) to filter the feed.
+Implement the following visual Verification Badges on each post card based on the verificationStatus:
+
+Status: unverified -> Renders a Zinc badge ("Pending"). Default state on submission.
+
+Status: community -> Renders an Orange badge ("Community").
+
+Status: editor -> Renders a Blue badge ("Editor").
+
+Status: verified -> Renders an Emerald badge ("Verified").
+
+4. The "Post News" Form:
+Build a form component that writes directly to the posts collection. It must include:
+
+A dropdown for category.
+
+A <textarea> for the headline and report details.
+
+A checkbox to flag as isBreaking.
+
+On submit, auto-inject the user's ID, a default location (e.g., "Palasia, Indore"), set status to unverified, and use serverTimestamp().
+
+5. Credibility Score Dashboard (Profile View):
+Build a dedicated Profile page that tracks a journalist's trustworthiness.
+
+Visual Graph: Use Recharts to render a line chart mapping the reputationHistory array so users can see how their score has grown or dropped over time.
+
+Activity Ledger: Render a timeline list beneath the graph showing the exact reasons for point fluctuations (e.g., "+5 points: Post community verified", "-15 points: Post flagged as misinformation by editor").
+
+6. Design System & Styling:
+Strictly adhere to this color palette:
+
+Backgrounds: Global background bg-zinc-950. Post cards bg-[#18181b] with border-zinc-800.
+
+Accents: Use emerald-500 and emerald-600 for primary action buttons, breaking news indicators, positive score changes, and verified checkmarks. Use red/rose for negative score changes.
+
+Typography: Clean, sans-serif. Use zinc-400 for secondary text and white/zinc-100 for primary text to maintain high contrast.
+
+Execution Instructions:
+Do not generate the entire app in one block. Let's build this step-by-step:
+
+First, scaffold the layout, navigation components, and color scheme.
+
+Second, build the "Post News" form and the Feed UI with dynamic Verification Badges.
+
+Third, build the Profile view with the Credibility line chart and history ledger.
