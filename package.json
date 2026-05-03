@@ -3,12 +3,13 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "scripts": {
+ "scripts": {
     "dev": "concurrently -k -n api,web -c magenta,cyan \"pnpm -C artifacts/api-server dev\" \"pnpm -C artifacts/khabar dev\"",
     "dev:web": "pnpm -C artifacts/khabar dev",
     "dev:api": "pnpm -C artifacts/api-server dev",
     "db:clear-demo": "pnpm -C scripts clear-demo-data",
-    "build": "pnpm -r --filter ./artifacts/api --filter ./artifacts/khabar --if-present run build",
+    "build": "pnpm -r --filter ./artifacts/api-server --filter ./artifacts/khabar --if-present run build",
+    "start": "pnpm -C artifacts/api-server start",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "format": "prettier . -w"
