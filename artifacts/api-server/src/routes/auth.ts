@@ -47,7 +47,11 @@ function otpKey(uid: string): string {
 }
 
 function getWebBaseUrl(): string {
-  return (process.env.WEB_BASE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
+  // In production we serve the web app from the same Express host, so prefer relative redirects.
+  // If you deploy the frontend on a separate domain, set CLIENT_URL (or WEB_BASE_URL) explicitly.
+  const raw = (process.env.CLIENT_URL ?? process.env.WEB_BASE_URL ?? "").trim();
+  if (!raw) return "";
+  return raw.replace(/\/+$/, "");
 }
 
 function getGoogleOAuthClient(): { client: OAuth2Client; redirectUri: string } | null {
@@ -225,7 +229,9 @@ router.get("/auth/google/callback", async (req, res): Promise<void> => {
     const token = signToken(user.uid);
     setAuthCookie(res, token);
 
-    res.redirect(`${getWebBaseUrl()}${next.startsWith("/") ? next : `/${next}`}`);
+    // Always redirect to same-origin path by default.
+    const safeNext = next.startsWith("/") ? next : `/${next}`;
+    res.redirect(`${getWebBaseUrl()}${safeNext}`);
   } catch (err) {
     req.log.warn({ err }, "Google OAuth callback failed");
     res.redirect(`${getWebBaseUrl()}/login?next=${encodeURIComponent(next)}&error=google_oauth_failed`);
