@@ -139,16 +139,17 @@ export default function Register() {
           <p className="text-sm text-zinc-500 mb-6">Create your account to start filing reports.</p>
 
           <Button
-            type="button"
             variant="outline"
             className="w-full border-zinc-800 bg-zinc-950 hover:bg-zinc-900"
-            onClick={() => {
-              window.location.href = `/api/auth/google/start?next=${encodeURIComponent("/")}`;
-            }}
-            data-testid="button-google-register"
+            asChild
           >
-            <GoogleIcon className="h-5 w-5 mr-2" />
-            Continue with Google
+            <a
+              href={`/api/auth/google?next=${encodeURIComponent("/")}`}
+              data-testid="button-google-register"
+            >
+              <GoogleIcon className="h-5 w-5 mr-2" />
+              Continue with Google
+            </a>
           </Button>
 
           <div className="my-5 flex items-center gap-3">

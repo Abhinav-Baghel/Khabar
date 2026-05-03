@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Response } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { randomBytes } from "crypto";
 import { eq, or } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
@@ -24,6 +24,7 @@ import {
   type AuthedRequest,
 } from "../lib/auth";
 import { getUserCounts, serializeCurrentUser } from "../lib/serializers";
+import { sendEmailOtp, sendPhoneOtp } from "../lib/otpDelivery";
 
 const router: IRouter = Router();
 
@@ -79,9 +80,19 @@ async function findAvailableUsername(base: string): Promise<string> {
   return `${candidateBase}_${randomBytes(3).toString("hex")}`;
 }
 
-router.get("/auth/google/start", async (req, res): Promise<void> => {
+async function startGoogleOAuth(req: Request, res: Response): Promise<void> {
   const oauth = getGoogleOAuthClient();
   if (!oauth) {
+    req.log.warn(
+      {
+        missingEnv: {
+          GOOGLE_CLIENT_ID: !process.env.GOOGLE_CLIENT_ID,
+          GOOGLE_CLIENT_SECRET: !process.env.GOOGLE_CLIENT_SECRET,
+          GOOGLE_REDIRECT_URI: !process.env.GOOGLE_REDIRECT_URI,
+        },
+      },
+      "Google OAuth start requested but credentials are not configured",
+    );
     res.status(501).json({
       error:
         "Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI.",
@@ -100,7 +111,11 @@ router.get("/auth/google/start", async (req, res): Promise<void> => {
   });
 
   res.redirect(url);
-});
+}
+
+/** Canonical entry for SPA links; same behavior as `/auth/google/start`. */
+router.get("/auth/google", startGoogleOAuth);
+router.get("/auth/google/start", startGoogleOAuth);
 
 router.get("/auth/google/callback", async (req, res): Promise<void> => {
   const oauth = getGoogleOAuthClient();
@@ -236,9 +251,48 @@ router.post("/auth/verify/request", requireAuth, async (req: AuthedRequest, res)
   const existing = otpStore.get(key) ?? {};
   otpStore.set(key, { ...existing, [channel]: { code, expiresAtMs } });
 
-  // Mock "sending" the OTP (dev requirement)
-  console.log(`[OTP] uid=${user.uid} channel=${channel} otp=${code}`);
-  req.log.info({ uid: user.uid, channel, otp: code }, "Mock OTP generated");
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (channel === "email") {
+    const delivered = await sendEmailOtp(req.log, user.email, code);
+    if (!delivered.ok) {
+      if (delivered.error === "smtp_not_configured") {
+        if (isProd) {
+          req.log.error(
+            { uid: user.uid, channel },
+            "Production email OTP: SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)",
+          );
+          res.status(503).json({ error: "Verification email could not be sent. Try again later." });
+          return;
+        }
+        console.log(`[OTP] uid=${user.uid} channel=${channel} otp=${code}`);
+        req.log.info({ uid: user.uid, channel, otp: code }, "Dev fallback: OTP logged (SMTP not configured)");
+      } else {
+        res.status(503).json({ error: "Failed to send verification email" });
+        return;
+      }
+    }
+  } else {
+    const phone = user.phoneNumber!;
+    const delivered = await sendPhoneOtp(req.log, phone, code);
+    if (!delivered.ok) {
+      if (delivered.error === "sms_not_configured") {
+        if (isProd) {
+          req.log.error(
+            { uid: user.uid, channel },
+            "Production phone OTP: no SMS provider (configure Twilio or MSG91)",
+          );
+          res.status(503).json({ error: "Verification SMS could not be sent. Try again later." });
+          return;
+        }
+        console.log(`[OTP] uid=${user.uid} channel=${channel} otp=${code}`);
+        req.log.info({ uid: user.uid, channel, otp: code }, "Dev fallback: OTP logged (SMS not configured)");
+      } else {
+        res.status(503).json({ error: "Failed to send verification SMS" });
+        return;
+      }
+    }
+  }
 
   res.json({ ok: true, channel, expiresInSeconds: 600 });
 });

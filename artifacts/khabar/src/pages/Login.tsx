@@ -88,16 +88,17 @@ export default function Login() {
           <p className="text-sm text-zinc-500 mb-6">Sign in to file and verify hyperlocal news.</p>
 
           <Button
-            type="button"
             variant="outline"
             className="w-full border-zinc-800 bg-zinc-950 hover:bg-zinc-900"
-            onClick={() => {
-              window.location.href = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
-            }}
-            data-testid="button-google-login"
+            asChild
           >
-            <GoogleIcon className="h-5 w-5 mr-2" />
-            Continue with Google
+            <a
+              href={`/api/auth/google?next=${encodeURIComponent(next)}`}
+              data-testid="button-google-login"
+            >
+              <GoogleIcon className="h-5 w-5 mr-2" />
+              Continue with Google
+            </a>
           </Button>
 
           <div className="my-5 flex items-center gap-3">

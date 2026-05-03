@@ -320,7 +320,10 @@ export default function PostNews() {
                             className="border-zinc-800 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-emerald-400"
                             disabled={isLocating}
                             onClick={async () => {
-                              if (!navigator.geolocation) return toast.error("GPS is not available in this browser.");
+                              if (!navigator.geolocation) {
+                                toast.error("GPS is not available in this browser.");
+                                return;
+                              }
                               setIsLocating(true);
                               navigator.geolocation.getCurrentPosition(
                                 async (pos) => {
