@@ -51,7 +51,7 @@ const frontendPath = path.join(__dirname, "../../khabar/dist/public");
 app.use(express.static(frontendPath));
 
 // Catch-all route: If they ask for any URL not handled by "/api", send them the React app!
-app.get("*", (req, res) => {
+app.get(/.*/, (req, res) => {
   res.sendFile(path.join(frontendPath, "index.html"));
 });
 // --------------------------------------
