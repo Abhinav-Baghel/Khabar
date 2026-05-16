@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useLocation } from "wouter";
-import { Radio, Loader2, Mail, Phone } from "lucide-react";
+import { Radio, Loader2, Mail, Phone, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import { toast } from "sonner";
 type Channel = "email" | "phone";
 
 export default function Verify() {
-  const { user, refresh } = useAuth();
+  const { user, refresh, logout } = useAuth();
   const [, navigate] = useLocation();
 
   const requiresPhone = !!user?.phoneNumber;
@@ -21,6 +21,31 @@ export default function Verify() {
   const [emailCode, setEmailCode] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+
+  async function handleChangeEmail() {
+    setLeaving(true);
+    try {
+      await logout();
+      navigate("/register");
+    } finally {
+      setLeaving(false);
+    }
+  }
+
+  async function handleGoBack() {
+    setLeaving(true);
+    try {
+      await logout();
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        navigate("/login");
+      }
+    } finally {
+      setLeaving(false);
+    }
+  }
 
   const steps = useMemo(() => {
     const list: { channel: Channel; title: string; icon: ReactNode }[] = [
@@ -120,6 +145,18 @@ export default function Verify() {
                       <div className="text-xs text-zinc-500 mt-1">
                         {destination}
                       </div>
+                      {!isVerified && s.channel === "email" && (
+                        <button
+                          type="button"
+                          onClick={() => void handleChangeEmail()}
+                          disabled={leaving}
+                          aria-label="Change email and return to registration"
+                          className="text-xs text-emerald-400 hover:text-emerald-300 mt-1.5 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50 rounded disabled:opacity-50"
+                          data-testid="link-change-email"
+                        >
+                          Wrong email? Change email
+                        </button>
+                      )}
                     </div>
                     {isVerified ? (
                       <div className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-md">
@@ -193,6 +230,20 @@ export default function Verify() {
                 {error}
               </div>
             )}
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-zinc-800 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-zinc-400 hover:text-zinc-200"
+              disabled={leaving}
+              onClick={() => void handleGoBack()}
+              data-testid="button-go-back"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+              Go back
+            </Button>
           </div>
         </div>
       </div>
