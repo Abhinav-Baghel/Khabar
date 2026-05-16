@@ -1,6 +1,11 @@
 import { ExternalLink, Globe, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
+import {
+  useArticleAiVerify,
+  AiVerifyTriggerButton,
+  AiVerifyResultPanel,
+} from "@/components/AiVerifySection";
 
 export type NewsItem = {
   id: string;
@@ -14,6 +19,9 @@ export type NewsItem = {
 };
 
 export function NewsCard({ item }: { item: NewsItem }) {
+  const articleContent = item.description?.trim() || item.title;
+  const aiVerify = useArticleAiVerify(item.title, articleContent);
+
   return (
     <article className="p-4 sm:p-5 border-b border-zinc-800 bg-[#18181b] transition-colors hover:bg-zinc-900/80 group">
       <div className="flex items-start justify-between gap-4 mb-3">
@@ -36,15 +44,21 @@ export function NewsCard({ item }: { item: NewsItem }) {
           </span>
         </div>
 
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noreferrer"
-          className="text-zinc-500 hover:text-zinc-200 transition-colors shrink-0"
-          title="Open source"
-        >
-          <ExternalLink className="w-4 h-4" />
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          <AiVerifyTriggerButton
+            loading={aiVerify.loading}
+            onClick={() => void aiVerify.verify()}
+          />
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-zinc-500 hover:text-zinc-200 transition-colors"
+            title="Open source"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
+        </div>
       </div>
 
       <h2 className="text-xl font-bold text-zinc-100 mb-2 leading-snug">
@@ -55,6 +69,14 @@ export function NewsCard({ item }: { item: NewsItem }) {
         <p className="text-zinc-400 text-sm mb-4 line-clamp-3 leading-relaxed">
           {item.description}
         </p>
+      )}
+
+      {aiVerify.showPanel && (
+        <AiVerifyResultPanel
+          state={aiVerify.state}
+          result={aiVerify.result}
+          className="mb-4"
+        />
       )}
 
       {item.imageUrl && (
@@ -70,4 +92,3 @@ export function NewsCard({ item }: { item: NewsItem }) {
     </article>
   );
 }
-
