@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { 
-  ArrowUp, ArrowDown, Bookmark, MessageSquare, ShieldAlert, ShieldCheck, 
-  MapPin, Clock, CheckCircle2, AlertTriangle, MoreHorizontal
+  ArrowUp, ArrowDown, Bookmark, ShieldAlert, ShieldCheck, 
+  MapPin, Clock, CheckCircle2, AlertTriangle, MoreHorizontal, Sparkles, Loader2
 } from "lucide-react";
 import { 
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger 
@@ -16,7 +16,7 @@ import {
   Post, VerificationStatus, useVotePost, useSavePost, useVerifyPost,
   getListPostsQueryKey, getGetStatsOverviewQueryKey
 } from "@workspace/api-client-react";
-import { API_BASE_URL } from "@/lib/auth";
+import { API_BASE_URL, authFetch } from "@/lib/auth";
 
 function objectUrl(path: string | null | undefined): string | undefined {
   if (!path) return undefined;
@@ -24,11 +24,49 @@ function objectUrl(path: string | null | undefined): string | undefined {
   return `${API_BASE_URL}/storage${path}`;
 }
 
+type AiVerdict = "Likely True" | "Needs Context" | "Misleading" | "Unverifiable";
+
+type AiVerifyResult = {
+  verdict: AiVerdict;
+  explanation: string;
+};
+
+const verdictStyles: Record<AiVerdict, string> = {
+  "Likely True": "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+  "Needs Context": "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  Misleading: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+  Unverifiable: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
+};
+
 export function PostCard({ post }: { post: Post }) {
   const queryClient = useQueryClient();
   const votePost = useVotePost();
   const savePost = useSavePost();
   const verifyPost = useVerifyPost();
+
+  const [aiVerifyState, setAiVerifyState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [aiVerifyResult, setAiVerifyResult] = useState<AiVerifyResult | null>(null);
+
+  async function handleAiVerify() {
+    setAiVerifyState("loading");
+    setAiVerifyResult(null);
+    try {
+      const res = await authFetch("/ai/verify-article", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          articleTitle: post.headline,
+          articleContent: post.details,
+        }),
+      });
+      if (!res.ok) throw new Error("AI verification failed");
+      const data = (await res.json()) as AiVerifyResult;
+      setAiVerifyResult(data);
+      setAiVerifyState("done");
+    } catch {
+      setAiVerifyState("error");
+    }
+  }
 
   const handleVote = (direction: "up" | "down") => {
     const newDirection = post.currentUserVote === direction ? "clear" : direction;
@@ -119,6 +157,43 @@ export function PostCard({ post }: { post: Post }) {
         {post.details}
       </p>
 
+      {(aiVerifyState === "loading" || aiVerifyResult || aiVerifyState === "error") && (
+        <div
+          className="mb-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 sm:p-4"
+          data-testid="ai-verify-result"
+        >
+          {aiVerifyState === "loading" && (
+            <p className="text-sm text-zinc-400 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-emerald-500" aria-hidden="true" />
+              AI is analyzing...
+            </p>
+          )}
+          {aiVerifyState === "error" && (
+            <p className="text-sm text-rose-400">
+              AI verification is unavailable. Please try again later.
+            </p>
+          )}
+          {aiVerifyResult && (
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+                  AI verdict
+                </span>
+                <Badge
+                  variant="outline"
+                  className={verdictStyles[aiVerifyResult.verdict] ?? verdictStyles.Unverifiable}
+                >
+                  {aiVerifyResult.verdict}
+                </Badge>
+              </div>
+              <p className="text-sm text-zinc-300 leading-relaxed">
+                {aiVerifyResult.explanation}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center bg-zinc-800/50 rounded-full border border-zinc-800">
@@ -142,6 +217,23 @@ export function PostCard({ post }: { post: Post }) {
           <button onClick={handleSave} className={`p-2 rounded-full transition-colors ${post.savedByCurrentUser ? "text-emerald-500 bg-emerald-500/10" : "text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800"}`}>
             <Bookmark className={`w-5 h-5 ${post.savedByCurrentUser ? "fill-current" : ""}`} />
           </button>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={aiVerifyState === "loading"}
+            onClick={() => void handleAiVerify()}
+            className="border-zinc-700 bg-zinc-900/50 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 gap-1.5 h-8"
+            data-testid="button-ai-verify"
+          >
+            {aiVerifyState === "loading" ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+            )}
+            AI Verify
+          </Button>
         </div>
 
         <div className="flex items-center gap-3">
