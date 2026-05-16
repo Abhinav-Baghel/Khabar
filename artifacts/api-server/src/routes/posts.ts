@@ -30,6 +30,7 @@ import { loadCurrentUser, requireAuth, type AuthedRequest } from "../lib/auth";
 import { serializePosts } from "../lib/serializers";
 import * as z from "zod";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GEMINI_MODEL } from "../lib/gemini";
 
 const router: IRouter = Router();
 
@@ -64,7 +65,7 @@ async function runAiAnalysis(opts: {
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: GEMINI_MODEL,
     systemInstruction:
       "You are a strict JSON generator. Output ONLY a single JSON object and nothing else.",
   });

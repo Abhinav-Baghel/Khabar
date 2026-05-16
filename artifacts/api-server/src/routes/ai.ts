@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import * as z from "zod";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GEMINI_MODEL } from "../lib/gemini";
 
 const router: IRouter = Router();
 
@@ -61,7 +62,7 @@ async function analyzeWithGemini(opts: { headline: string; details: string }) {
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: GEMINI_MODEL,
     systemInstruction:
       "You are a strict JSON generator. Output ONLY a single JSON object and nothing else.",
   });
@@ -90,7 +91,7 @@ async function verifyArticleWithGemini(opts: { articleTitle: string; articleCont
 
   const genAI = new GoogleGenerativeAI(key);
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: GEMINI_MODEL,
     systemInstruction:
       "You are an impartial fact-checker and strict JSON generator. Output ONLY a single JSON object and nothing else.",
   });
