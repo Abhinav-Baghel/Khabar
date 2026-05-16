@@ -270,8 +270,8 @@ router.post("/auth/verify/request", requireAuth, async (req: AuthedRequest, res)
     if (channel === "email") {
       const delivered = await sendEmailOtp(req.log, user.email, code);
       if (!delivered.ok) {
-        if (!isProd && delivered.error === "smtp_not_configured") {
-          // Dev-only convenience: allow local testing without SMTP.
+        if (!isProd && delivered.error === "resend_not_configured") {
+          // Dev-only convenience: allow local testing without Resend.
           console.log(`[OTP] uid=${user.uid} channel=${channel} otp=${code}`);
         } else {
           res.status(503).json({ error: "Failed to send OTP. Please contact support." });

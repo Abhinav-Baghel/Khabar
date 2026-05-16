@@ -1,8 +1,8 @@
 import type { Logger } from "pino";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 export type OtpDeliveryResult =
-  | { ok: true; via: "smtp" | "twilio" | "msg91" | "mock" }
+  | { ok: true; via: "resend" | "twilio" | "msg91" | "mock" }
   | { ok: false; error: string; details?: Record<string, unknown> };
 
 export type OtpDeliveryErrorKind = "config" | "provider";
@@ -43,61 +43,82 @@ function missingEnv(keys: string[]): Record<string, boolean> {
   return Object.fromEntries(keys.map((k) => [k, !process.env[k]]));
 }
 
-export async function sendEmailOtp(log: Logger, to: string, code: string): Promise<OtpDeliveryResult> {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = process.env.SMTP_PORT;
-  const from = process.env.SMTP_FROM ?? process.env.MAIL_FROM ?? user;
+let resendClient: Resend | null = null;
 
-  if (!host || !user || !pass) {
-    const missing = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].filter((k) => !process.env[k]);
+function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return null;
+  if (!resendClient) {
+    resendClient = new Resend(apiKey);
+  }
+  return resendClient;
+}
+
+export async function sendEmailOtp(log: Logger, to: string, code: string): Promise<OtpDeliveryResult> {
+  const from = process.env.MAIL_FROM || "onboarding@resend.dev";
+  const resend = getResendClient();
+
+  if (!resend) {
+    const missing = ["RESEND_API_KEY"];
     if (isProductionEnv()) {
-      throw new OtpDeliveryError("OTP email delivery is not configured (missing SMTP environment variables).", {
+      throw new OtpDeliveryError("OTP email delivery is not configured (missing RESEND_API_KEY).", {
         kind: "config",
         httpStatus: 500,
         details: { missing },
       });
     }
     log.warn(
-      { channel: "email", missingEnv: missingEnv(["SMTP_HOST", "SMTP_USER", "SMTP_PASS"]), to: maskEmail(to) },
-      "OTP email: SMTP not configured (set SMTP_HOST, SMTP_USER, SMTP_PASS)",
+      { channel: "email", missingEnv: missingEnv(["RESEND_API_KEY"]), to: maskEmail(to) },
+      "OTP email: Resend not configured (set RESEND_API_KEY)",
     );
-    return { ok: false, error: "smtp_not_configured", details: { missing } };
-  }
-
-  if (!from) {
-    log.warn({ channel: "email" }, "OTP email: set SMTP_FROM or MAIL_FROM for a valid From header");
+    return { ok: false, error: "resend_not_configured", details: { missing } };
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port: port ? Number(port) : 587,
-      secure: process.env.SMTP_SECURE === "true",
-      auth: { user, pass },
-    });
-    await transporter.sendMail({
-      from: from ?? user,
-      to,
+    const { data, error } = await resend.emails.send({
+      from,
+      to: [to],
       subject: process.env.OTP_EMAIL_SUBJECT ?? "Your Khabar verification code",
       text: `Your Khabar verification code is ${code}. It expires in 10 minutes.`,
     });
-    log.info({ channel: "email", to: maskEmail(to) }, "OTP email sent via SMTP");
-    return { ok: true, via: "smtp" };
+
+    if (error) {
+      log.error(
+        {
+          channel: "email",
+          to: maskEmail(to),
+          resendError: error,
+        },
+        "OTP email: Resend API returned an error",
+      );
+      if (isProductionEnv()) {
+        throw new OtpDeliveryError("OTP email delivery failed (Resend provider unavailable).", {
+          kind: "provider",
+          httpStatus: 503,
+          details: { message: error.message, name: error.name },
+        });
+      }
+      return {
+        ok: false,
+        error: "resend_send_failed",
+        details: { message: error.message, name: error.name },
+      };
+    }
+
+    log.info({ channel: "email", to: maskEmail(to), resendId: data?.id }, "OTP email sent via Resend");
+    return { ok: true, via: "resend" };
   } catch (err) {
+    if (err instanceof OtpDeliveryError) throw err;
     log.error(
       {
         err,
         channel: "email",
         to: maskEmail(to),
-        smtpHost: host,
-        smtpPort: port ?? "587",
       },
-      "OTP email: nodemailer send failed (check SMTP_*, network, firewall)",
+      "OTP email: Resend request failed",
     );
     if (isProductionEnv()) {
-      throw new OtpDeliveryError("OTP email delivery failed (SMTP provider unavailable).", {
+      throw new OtpDeliveryError("OTP email delivery failed (Resend provider unavailable).", {
         kind: "provider",
         httpStatus: 503,
         details: { message: err instanceof Error ? err.message : String(err) },
@@ -105,7 +126,7 @@ export async function sendEmailOtp(log: Logger, to: string, code: string): Promi
     }
     return {
       ok: false,
-      error: "smtp_send_failed",
+      error: "resend_send_failed",
       details: { message: err instanceof Error ? err.message : String(err) },
     };
   }
