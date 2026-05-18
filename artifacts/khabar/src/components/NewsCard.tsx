@@ -20,7 +20,11 @@ export type NewsItem = {
 
 export function NewsCard({ item }: { item: NewsItem }) {
   const articleContent = item.description?.trim() || item.title;
-  const aiVerify = useArticleAiVerify(item.title, articleContent);
+  const aiVerify = useArticleAiVerify({
+    articleTitle: item.title,
+    articleContent,
+    articleUrl: item.url,
+  });
 
   return (
     <article className="p-4 sm:p-5 border-b border-zinc-800 bg-[#18181b] transition-colors hover:bg-zinc-900/80 group">

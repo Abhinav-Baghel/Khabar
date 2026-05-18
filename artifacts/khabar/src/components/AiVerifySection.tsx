@@ -20,7 +20,19 @@ const verdictStyles: Record<AiVerdict, string> = {
   Unverifiable: "bg-zinc-500/10 text-zinc-400 border-zinc-500/20",
 };
 
-export function useArticleAiVerify(articleTitle: string, articleContent: string) {
+export type ArticleAiVerifyInput = {
+  articleTitle: string;
+  /** Short summary or body text; always sent as a scrape fallback */
+  articleContent: string;
+  /** External source URL (e.g. news feed `item.url`) for full-article scraping */
+  articleUrl?: string;
+};
+
+export function useArticleAiVerify({
+  articleTitle,
+  articleContent,
+  articleUrl,
+}: ArticleAiVerifyInput) {
   const [state, setState] = useState<AiVerifyState>("idle");
   const [result, setResult] = useState<AiVerifyResult | null>(null);
 
@@ -28,13 +40,19 @@ export function useArticleAiVerify(articleTitle: string, articleContent: string)
     setState("loading");
     setResult(null);
     try {
+      const trimmedUrl = articleUrl?.trim();
+      const payload: Record<string, string> = {
+        articleTitle: articleTitle.trim(),
+        articleContent: articleContent.trim(),
+      };
+      if (trimmedUrl) {
+        payload.articleUrl = trimmedUrl;
+      }
+
       const res = await authFetch("/ai/verify-article", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          articleTitle,
-          articleContent,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("AI verification failed");
       const data = (await res.json()) as AiVerifyResult;
@@ -43,7 +61,7 @@ export function useArticleAiVerify(articleTitle: string, articleContent: string)
     } catch {
       setState("error");
     }
-  }, [articleTitle, articleContent]);
+  }, [articleTitle, articleContent, articleUrl]);
 
   const showPanel = state === "loading" || result !== null || state === "error";
 

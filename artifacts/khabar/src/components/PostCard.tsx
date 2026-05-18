@@ -34,7 +34,10 @@ export function PostCard({ post }: { post: Post }) {
   const savePost = useSavePost();
   const verifyPost = useVerifyPost();
 
-  const aiVerify = useArticleAiVerify(post.headline, post.details);
+  const aiVerify = useArticleAiVerify({
+    articleTitle: post.headline,
+    articleContent: post.details,
+  });
 
   const handleVote = (direction: "up" | "down") => {
     const newDirection = post.currentUserVote === direction ? "clear" : direction;

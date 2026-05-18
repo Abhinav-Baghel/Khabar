@@ -3,6 +3,8 @@ import * as z from "zod";
 import { requireAuth, type AuthedRequest } from "../lib/auth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GEMINI_MODEL } from "../lib/gemini";
+import { scrapeArticleText } from "../lib/articleScraper";
+import type { Logger } from "pino";
 
 const router: IRouter = Router();
 
@@ -23,10 +25,12 @@ const VerifyArticleBody = z
     articleTitle: z.string().min(1),
     articleContent: z.string().min(1).optional(),
     summary: z.string().min(1).optional(),
+    articleUrl: z.string().url().optional(),
   })
-  .refine((data) => !!(data.articleContent?.trim() || data.summary?.trim()), {
-    message: "articleContent or summary is required",
-  });
+  .refine(
+    (data) => !!(data.articleContent?.trim() || data.summary?.trim() || data.articleUrl?.trim()),
+    { message: "articleContent, summary, or articleUrl is required" },
+  );
 
 const VerifyArticleVerdict = z.enum([
   "Likely True",
@@ -119,6 +123,23 @@ async function verifyArticleWithGemini(opts: { articleTitle: string; articleCont
   return VerifyArticleSchema.parse(parsed);
 }
 
+async function resolveArticleContentForVerify(
+  log: Logger,
+  opts: { articleUrl?: string; fallbackContent: string },
+): Promise<string> {
+  const url = opts.articleUrl?.trim();
+  if (!url) return opts.fallbackContent;
+
+  try {
+    const scraped = await scrapeArticleText(url);
+    log.info({ articleUrl: url, charCount: scraped.length }, "AI verify: using scraped full article text");
+    return scraped;
+  } catch (err) {
+    log.warn({ err, articleUrl: url }, "AI verify: article scrape failed, using summary fallback");
+    return opts.fallbackContent;
+  }
+}
+
 router.post("/ai/prescan", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   const parsed = PrescanBody.safeParse(req.body);
   if (!parsed.success) {
@@ -143,9 +164,18 @@ router.post("/ai/verify-article", requireAuth, async (req: AuthedRequest, res): 
     return;
   }
 
-  const articleContent = (parsed.data.articleContent ?? parsed.data.summary ?? "").trim();
+  const fallbackContent = (parsed.data.articleContent ?? parsed.data.summary ?? "").trim();
+  if (!fallbackContent && !parsed.data.articleUrl?.trim()) {
+    res.status(400).json({ error: "articleContent or articleUrl is required" });
+    return;
+  }
 
   try {
+    const articleContent = await resolveArticleContentForVerify(req.log, {
+      articleUrl: parsed.data.articleUrl,
+      fallbackContent: fallbackContent || parsed.data.articleTitle.trim(),
+    });
+
     const result = await verifyArticleWithGemini({
       articleTitle: parsed.data.articleTitle.trim(),
       articleContent,
